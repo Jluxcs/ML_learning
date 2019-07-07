@@ -17,6 +17,7 @@
 
 from math import log
 import operator
+import matplotlib.pyplot as plt
 
 def createDataSet():
     """
@@ -25,13 +26,14 @@ def createDataSet():
     :return: 返回数据集和对应的label标签
     """
     dataSet = [[1, 1, 'yes'], [1, 1, 'yes'],[1, 0, 'no'], [0, 1, 'no'], [0, 1, 'no']]
-    labels = ['no surfacing', 'flippers']
+    labels = ['no surfacing', 'flippers']   # 不出露出水面   脚蹼
     return dataSet, labels
 
+#计算信息增益，为了寻找最优特征
 def calShannonEnt(dataSet):
-    #求list长度，表示计算参与训咯的数据量
+    #求list长度，表示计算参与训练的数据量
     numEntries = len(dataSet)
-    #分裂标签出现的次数
+    #分类标签出现的次数
     lableCounts = {}
     for feat in dataSet:
         currentLabel = feat[-1]
@@ -45,7 +47,7 @@ def calShannonEnt(dataSet):
         prob = float(lableCounts[key]) / numEntries
         #计算香农熵， 以2为底  求对数
         shannonEnt -= prob * log(prob , 2)
-    return  shannonEnt
+    return shannonEnt
 
 def splitDataSet(dataSet, index, value):
     """
@@ -56,18 +58,20 @@ def splitDataSet(dataSet, index, value):
     :return:
         index 列为value的数据集
     """
+    #append:  添加一个对象  整体打包
+    #extend: 向内容添加到列表中  合并 merge后面
     retDataSet = []
-    for feat in dataSet:
+    for featVec in dataSet:
         #index列为value的数据集
         #判断index列的值是否为value
-        if feat[index] == value:
+        if featVec[index] == value:
             #[:index]
-            reducedFeatVec = feat[:index]
+            reducedFeatVec = featVec[:index]
             '''
             extend  append
             
             '''
-            reducedFeatVec.extend(feat[index+1:])
+            reducedFeatVec.extend(featVec[index+1:])
             retDataSet.append(reducedFeatVec)
     return retDataSet
 
@@ -94,7 +98,7 @@ def chooseBestFeatureSplit(dataSet):
             prob = len(subDataSet)/float(len(dataSet))
             newEntropy += prob * calShannonEnt(subDataSet)
         #信息增益
-        infoGain =  baseEntropy - newEntropy
+        infoGain = baseEntropy - newEntropy
         print('infoGain=', infoGain, 'bestFeature= ', i, baseEntropy, newEntropy)
         if (infoGain > bestInfoGain):
             bestInfoGain = infoGain
@@ -135,4 +139,104 @@ def majorityCnt(classList):
         classCount[vote] += 1
     sortedClassCount = sorted(classCount.items(), key=operator.itemgetter(1), reverse=True)
     return sortedClassCount[0][0]
+
+def classify(inputTree, featLabels, testVec):
+    """
+
+    :param inputTree:   决策树模型
+    :param featLabels:  feature标签对应的名称
+    :param testVec:  测试输入的数据
+    :return:   分类的结果，需要映射到label才能知道名称
+    """
+
+    #获取树的根节点对应的key值
+    firstStr = list(inputTree.keys())[0]
+    print('key值', firstStr)
+    #通过key知道根节点对应的value
+    secondDict = inputTree[firstStr]
+    print('根节点对应的value', secondDict)
+    #判断根节点名称获取根节点在label中的先后顺序，这样就知道输入的testVec怎么开始对照树来做分类
+    featIndex = featLabels.index(firstStr)
+    #测试数据，找到根节点对应的label的位置，也就知道从输入的数据的第几位开始进行分类
+    key = testVec[featIndex]
+    valueOFFeat = secondDict[key]
+    print('+++++', firstStr,  'xxxxx', secondDict, '-----', key, '<<<<<', valueOFFeat)
+    #判断分支是否结束，判断valueOFFeat是否是dict类型
+    if isinstance(valueOFFeat, dict):
+        classLabel = classify(valueOFFeat,featLabels,testVec)
+    else:
+        classLabel = valueOFFeat
+    return classLabel
+
+def get_tree_height(tree):
+    """
+    递归获取获取输的高度
+
+    :param tree: tree
+    :return: 高度
+    """
+
+    if not isinstance(tree, dict):
+        return 1
+    child_trees = list(tree.values())[0].values()
+
+    #遍历子树，获得字数的最大高度
+
+    max_height = 0
+
+    for child_tree in child_trees:
+        child_tree_height = get_tree_height(child_tree)
+
+        if child_tree_height > max_height:
+            max_height = child_tree_height
+    return max_height + 1
+
+def fishTest():
+    # 1.创建数据和结果的标签
+    myData, labels = createDataSet()
+    #打印myData  labels
+
+    #计算label的分类标签的香农熵
+
+    #calShannonEnt(myData)
+
+    import copy
+    myTree = createTree(myData, copy.deepcopy(labels))
+    print(myTree)
+    #[1,1]
+    print(classify(myTree, labels, [1, 1]))
+
+    #获取树的高度
+    print(get_tree_height(myTree))
+
+def ContactLensesTest():
+    """
+    眼镜类型的测试
+    :return:
+    """
+    #加载文本文件  数据集
+    fr = open('lenses.txt')
+    #解析数据， 获得features数据
+    lenses = [inst.strip().split('\t') for inst in fr.readlines()]
+    #得到数据对应的labels
+    lensesLabels = ['age', 'prescript', 'astigmatic', 'tearRate']
+    # 构建决策树
+    lensesTree = createTree(lenses, lensesLabels)
+    print(lensesTree)
+
+if __name__ == "__main__":
+    fishTest()
+    ContactLensesTest()
+
+
+
+
+
+
+
+
+
+
+
+
 
